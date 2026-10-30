@@ -1,0 +1,71 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Least privilege: the workflow can read the code and nothing else.
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      # Every action is pinned to a full commit SHA.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: js/package-lock.json
+      # Java unit + loopback tests, then the Python (http.client, raw socket, curl) and Node interop suites.
+      - run: make ci
+      - name: Loopback benchmark (printed to the job summary)
+        run: make bench | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Install OSV-Scanner v2.6.0 (checksum-verified)
+        run: |
+          curl -sSfLo "$RUNNER_TEMP/osv-scanner" https://github.com/google/osv-scanner/releases/download/v2.6.0/osv-scanner_linux_amd64
+          echo "ca69b3d3cd08f889a49dc0a383122f71cc528b83803671df5fd874d97485b108  $RUNNER_TEMP/osv-scanner" | sha256sum -c -
+          chmod +x "$RUNNER_TEMP/osv-scanner"
+          echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
+      - name: Known-vulnerability audit
+        run: make audit
+
+  # Live recursive resolution from the real root servers; GitHub runners allow outbound port 53.
+  live-dns:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+      - name: Resolve example.com from the root
+        run: |
+          make resolve NAME=example.com TYPE=A | tee resolve.log
+          if grep -q "lookup 1: NOERROR" resolve.log && grep -q "lookup 2: NOERROR, 0 upstream queries" resolve.log; then
+            echo "::notice title=live DNS::example.com resolved from the root servers; second lookup served from cache"
+          else
+            echo "::error title=live DNS::example.com did not resolve"; exit 1
+          fi
