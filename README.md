@@ -172,7 +172,7 @@ This is a learning and portfolio system, not a hosted production service. Everyt
 
 - Every GitHub Action is pinned to a commit SHA; workflows run read-only, without persisted credentials.
 - Dependabot update pull requests are paused (`open-pull-requests-limit: 0`) so the repository keeps a single `main` branch; dependencies are updated by hand and checked by the CI audit.
-- The CI workflow is written to run lint, tests, `make bench`, a live resolution job, `pip-audit`, `npm audit` and OSV-Scanner on a CycloneDX SBOM of the Java dependencies on every push; first CI run pending (the numbers in this README come from local runs).
+- The CI workflow is written to run lint, tests, `make bench`, a live resolution job, `pip-audit`, `npm audit` and OSV-Scanner on a CycloneDX SBOM of the Java dependencies on every push; it is green ([run](https://github.com/EquinoxWN/network-stack-from-scratch/actions/runs/41144850446)), and the live job resolved example.com from the root servers. The numbers in this README come from local runs.
 - Inputs are bounded: DNS section counts are checked before allocation, HTTP lines, headers and bodies have size limits, and responses refuse header values containing CR or LF.
 - Report vulnerabilities privately: see [SECURITY.md](SECURITY.md). To contribute, see [CONTRIBUTING.md](CONTRIBUTING.md).
 

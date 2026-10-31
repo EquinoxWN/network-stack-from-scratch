@@ -28,5 +28,5 @@ This project is pre-1.0. Only the latest commit on `main` receives fixes.
 - Every GitHub Action is pinned to a full commit SHA, and workflows run with read-only
   permissions and without persisted credentials.
 - Dependabot update pull requests are paused (`open-pull-requests-limit: 0`) so the repository keeps a single `main` branch; dependencies are updated by hand and checked by the CI audit.
-- The CI workflow runs lint, tests and a known-vulnerability check (pip-audit, npm audit, and OSV-Scanner on a CycloneDX SBOM of the Maven dependencies) on every push and pull request (first CI run pending).
+- The CI workflow runs lint, tests and a known-vulnerability check (pip-audit, npm audit, and OSV-Scanner on a CycloneDX SBOM of the Maven dependencies) on every push and pull request.
 - The Java code has no runtime dependencies; JUnit is the only Maven dependency (test scope).
