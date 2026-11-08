@@ -80,7 +80,7 @@ public final class Bench {
             double[] warm = new double[NAMES];
             for (int i = 0; i < NAMES; i++) {
                 // A fresh cache per name: every lookup walks root -> com -> example.com.
-                RecursiveResolver r = new RecursiveResolver(transport, new DnsCache(100, System::currentTimeMillis),
+                RecursiveResolver r = new RecursiveResolver(transport, new DnsCache(100, DnsCache.MONOTONIC_MILLIS),
                         List.of(new RecursiveResolver.ServerAddress("a.root-servers.net", InetAddress.getByName("198.41.0.4"))),
                         RecursiveResolver.Options.defaults(), new SecureRandom());
                 long t0 = System.nanoTime();

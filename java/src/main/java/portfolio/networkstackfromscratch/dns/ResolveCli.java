@@ -31,30 +31,37 @@ public final class ResolveCli {
         boolean twice = false;
         long timeoutMs = 2_000;
         Path capture = null;
-        for (int i = 0; i < args.length; i++) {
-            String a = args[i];
-            switch (a) {
-                case "--trace" -> trace = true;
-                case "--twice" -> twice = true;
-                case "--timeout-ms" -> timeoutMs = Long.parseLong(value(args, ++i));
-                case "--capture" -> capture = Path.of(value(args, ++i));
-                default -> {
-                    if (a.startsWith("--")) {
-                        return usage(out, "unknown option " + a);
-                    } else if (name == null) {
-                        name = a;
-                    } else {
-                        type = RecordType.parse(a);
+        try {
+            for (int i = 0; i < args.length; i++) {
+                String a = args[i];
+                switch (a) {
+                    case "--trace" -> trace = true;
+                    case "--twice" -> twice = true;
+                    case "--timeout-ms" -> timeoutMs = Long.parseLong(value(args, ++i));
+                    case "--capture" -> capture = Path.of(value(args, ++i));
+                    default -> {
+                        if (a.startsWith("--")) {
+                            return usage(out, "unknown option " + a);
+                        } else if (name == null) {
+                            name = a;
+                        } else {
+                            type = RecordType.parse(a);
+                        }
                     }
                 }
             }
+        } catch (IllegalArgumentException e) {
+            return usage(out, e.getMessage());
+        }
+        if (timeoutMs < 1 || timeoutMs > 60_000) {
+            return usage(out, "--timeout-ms must be in 1..60000");
         }
         if (name == null) {
             return usage(out, "missing name");
         }
         UdpTransport udp = new UdpTransport();
         Transport transport = capture == null ? udp : capturing(udp, capture);
-        DnsCache cache = new DnsCache(10_000, System::currentTimeMillis);
+        DnsCache cache = new DnsCache(10_000, DnsCache.MONOTONIC_MILLIS);
         RecursiveResolver resolver = new RecursiveResolver(transport, cache, RecursiveResolver.IANA_ROOTS,
                 RecursiveResolver.Options.defaults().withTimeout(Duration.ofMillis(timeoutMs)),
                 new java.security.SecureRandom());

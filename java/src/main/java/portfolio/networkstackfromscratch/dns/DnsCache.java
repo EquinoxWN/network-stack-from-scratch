@@ -38,6 +38,9 @@ public final class DnsCache {
     private record Stored(List<ResourceRecord> records, boolean negative, int rcode, Trust trust,
                           long storedAtMillis, long expiresAtMillis) {}
 
+    /** Monotonic milliseconds for TTL ageing: a wall-clock step (NTP, manual change) must not expire or revive records. */
+    public static final LongSupplier MONOTONIC_MILLIS = () -> System.nanoTime() / 1_000_000;
+
     private final LongSupplier clockMillis;
     private final Map<String, Stored> map;
     private long hits;

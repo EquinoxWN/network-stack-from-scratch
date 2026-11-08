@@ -13,6 +13,8 @@ import java.time.Duration;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
@@ -77,7 +79,9 @@ public final class HttpServer implements AutoCloseable {
     private final Selector selector;
     private final ServerSocketChannel listener;
     private final Thread loop;
-    private final List<Conn> conns = new ArrayList<>();
+    // Read by other threads (openConnections, close), so a concurrent set rather than an ArrayList.
+    private final Set<Conn> conns = ConcurrentHashMap.newKeySet();
+    private final AtomicLong errors = new AtomicLong();
     private final AtomicLong accepted = new AtomicLong();
     private final AtomicLong served = new AtomicLong();
     private final AtomicLong rejected = new AtomicLong();
@@ -158,6 +162,8 @@ public final class HttpServer implements AutoCloseable {
                 if (!running) {
                     return;
                 }
+                errors.incrementAndGet();
+                System.err.println("http-loop: " + e);
             }
         }
     }
@@ -218,6 +224,8 @@ public final class HttpServer implements AutoCloseable {
             try {
                 resp = handler.handle(r, new Handler.Connection(c.id, c.requests));
             } catch (RuntimeException e) {
+                errors.incrementAndGet();
+                System.err.println("handler failed on " + r.method() + " " + r.target() + ": " + e);
                 resp = HttpResponse.text(500, "internal error\n");
             }
             respond(c, key, resp, r.version(), keepAlive, "HEAD".equals(r.method()));
@@ -306,6 +314,11 @@ public final class HttpServer implements AutoCloseable {
         } catch (IOException e) {
             // Already closed by the peer; nothing left to release.
         }
+    }
+
+    /** Handler exceptions (answered with 500) and event-loop I/O errors so far. */
+    public long errors() {
+        return errors.get();
     }
 
     /** Number of open connections (for tests and stats). */
