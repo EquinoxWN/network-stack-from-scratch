@@ -9,7 +9,7 @@ Part of my **CS Foundations** list · Java · Python · JS
 
 ## Proof it works
 
-121 tests pass (Java 92, Python 20, Node.js 9), lint and type checks are clean, and the dependency audits find nothing:
+138 tests pass (Java 109, Python 20, Node.js 9), lint and type checks are clean, and the dependency audits find nothing (screenshot from the M1 run with Java 92; 17 Java tests were added in the 2026-11-01 quality pass):
 
 ![Java, Python and Node.js test runs and the dependency audit](docs/proof/tests.jpg)
 
@@ -88,7 +88,7 @@ The Java code uses the JDK only (no runtime dependencies). One part per language
 python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
 make setup        # Python dev tools, npm packages
 make lint         # javac -Werror, ruff + mypy --strict, tsc --checkJs --strict
-make test         # 121 tests: Java first, then Python and Node against the Java server
+make test         # 138 tests: Java first, then Python and Node against the Java server
 make bench        # loopback DNS and HTTP timings
 make resolve NAME=example.com TYPE=A   # live resolution from the root servers (outbound port 53)
 make serve        # demo server on http://127.0.0.1:8080
@@ -102,7 +102,7 @@ Full numbers, commands and every test name: [docs/results/m1.md](docs/results/m1
 
 | Check | Result |
 |---|---|
-| Tests (`make test`) | **121 passed** (Java 92, Python 20, Node.js 9), 0 failed |
+| Tests (`make test`) | **138 passed** (Java 109, Python 20, Node.js 9), 0 failed |
 | Lint (`make lint`) | clean: javac `-Xlint:all -Werror`, ruff, ruff format, mypy `--strict`, tsc `--checkJs --strict` |
 | Audit | pip-audit and npm audit: no known vulnerabilities; Maven: 9 dependencies, 0 known vulnerabilities (OSV) |
 | Live DNS (real network) | example.com: 3 queries, 484 ms; again from cache: 0 queries, 2.7 ms |
@@ -112,18 +112,22 @@ Full numbers, commands and every test name: [docs/results/m1.md](docs/results/m1
 
 | Test file | Tests | What it proves |
 |---|---|---|
-| `DnsCodecTest` | 14 | RFC 1035 byte layout, compression, all types round-trip, 500 random messages, 20,000 mutated inputs only raise format errors, pointer loops and bad lengths rejected |
+| `DnsCodecTest` | 15 | RFC 1035 byte layout, compression, all types round-trip, 500 random messages, 20,000 mutated inputs only raise format errors, pointer loops, chains over 64 jumps and bad lengths rejected |
 | `CaptureFixtureTest` | 10 | 8 real replies from root, .com and authoritative servers decode, re-encode and drive the resolver |
-| `DnsCacheTest` | 8 | TTL countdown and expiry, negative caching, trust levels, one-day cap, LRU bound |
-| `RecursiveResolverTest` | 16 | Simulated hierarchy: referrals, cache reuse, CNAMEs, glueless delegation, NXDOMAIN/NODATA, lame servers, poisoning and sideways referrals ignored, limits |
+| `DnsCacheTest` | 9 | TTL countdown and expiry, TTL 0 removes an entry, negative caching, trust levels, one-day cap, LRU bound |
+| `RecursiveResolverTest` | 18 | Simulated hierarchy: referrals, cache reuse, CNAMEs, glueless delegation, NXDOMAIN/NODATA, lame servers, poisoning, out-of-bailiwick glue and sideways referrals ignored, query and depth limits |
 | `UdpResolverTest` | 5 | Real UDP/TCP sockets on loopback: TCP fallback on truncation, spoofed id dropped, timeout |
-| `RequestParserTest` | 28 | Every split point gives the same requests; chunked with trailers; 20 ambiguous or malformed requests rejected; size limits; response framing |
-| `HttpServerTest` | 11 | Pipelining, chunked both ways, 100-continue, idle close and 408, HTTP/1.0, 503 at the limit, JDK HttpClient on one connection |
+| `UdpTransportTest` | 1 | A reply with the right id from another address is dropped |
+| `ResolveCliTest` | 8 | Bad options, missing values, non-numeric or out-of-range `--timeout-ms` and unknown types exit 64 before any query |
+| `RequestParserTest` | 29 | Every split point gives the same requests; chunked with trailers; 20 ambiguous or malformed requests rejected; size limits; response framing |
+| `HttpServerTest` | 14 | Pipelining, handler exception -> 500 and counted, last allowed request closes the connection, chunked both ways, 100-continue, idle close and 408, HTTP/1.0, 503 at the limit, JDK HttpClient on one connection |
 | `test_http_client_interop.py` | 6 | Python `http.client`: 50 requests on one connection, chunked upload and download |
 | `test_raw_wire.py` | 9 | Raw socket: pipelining order, chunk sizes and trailer on the wire, rejections close the connection |
 | `test_curl_interop.py` | 5 | curl reuses the connection, chunked upload, exact `--raw` framing, HTTP/1.0 |
 | `interop.test.js` | 6 | Node keep-alive agent (29 of 30 on a reused socket), chunked upload/download, fetch, pipelining, smuggling rejected |
 | `rawClient.test.js` | 3 | The raw response parser used by the Node tests |
+
+Quality check against the 10 engineering rules, with the mutation table: [docs/quality/2026-11-01.md](docs/quality/2026-11-01.md).
 
 ## Roadmap
 

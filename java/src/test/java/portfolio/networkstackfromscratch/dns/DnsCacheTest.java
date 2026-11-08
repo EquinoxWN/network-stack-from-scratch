@@ -88,4 +88,12 @@ class DnsCacheTest {
         assertThrows(IllegalArgumentException.class,
                 () -> cache.put(List.of(a("a", "192.0.2.1", 1), a("b", "192.0.2.2", 1)), DnsCache.Trust.ANSWER));
     }
+
+    @Test
+    void zeroTtlRemovesAnExistingEntry() {
+        cache.put(List.of(a("x", "192.0.2.1", 10)), DnsCache.Trust.ANSWER);
+        cache.put(List.of(a("x", "192.0.2.2", 0)), DnsCache.Trust.ANSWER);
+        assertEquals(0, cache.size());
+        assertTrue(cache.get("x", RecordType.A).isEmpty());
+    }
 }

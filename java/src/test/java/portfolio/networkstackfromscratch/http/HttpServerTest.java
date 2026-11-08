@@ -215,4 +215,46 @@ class HttpServerTest {
         assertEquals(1_000_000, stream.body().length);
         client.close();
     }
+    @Test
+    void handlerExceptionGets500AndIsCountedNotSwallowed() throws IOException {
+        server.close();
+        server = HttpServer.start(HttpServer.Config.loopback(0), (req, conn) -> {
+            throw new IllegalStateException("boom");
+        });
+        port = server.address().getPort();
+        try (Socket s = socket()) {
+            s.getOutputStream().write("GET / HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n"
+                    .getBytes(StandardCharsets.US_ASCII));
+            assertTrue(readToEof(s.getInputStream()).startsWith("HTTP/1.1 500 "));
+        }
+        assertEquals(1, server.errors());
+    }
+
+    @Test
+    void openConnectionsIsReadableFromAnotherThread() throws IOException {
+        try (Socket a = socket(); Socket b = socket()) {
+            a.getOutputStream().write("GET / HTTP/1.1\r\nHost: x\r\n\r\n".getBytes(StandardCharsets.US_ASCII));
+            b.getOutputStream().write("GET / HTTP/1.1\r\nHost: x\r\n\r\n".getBytes(StandardCharsets.US_ASCII));
+            a.getInputStream().read();
+            b.getInputStream().read();
+            assertEquals(2, server.openConnections());
+        }
+        assertEquals(0, server.errors());
+    }
+
+    @Test
+    void lastRequestAllowedOnAConnectionClosesIt() throws IOException {
+        server.close();
+        HttpServer.Config base = HttpServer.Config.loopback(0);
+        server = HttpServer.start(new HttpServer.Config(base.bind(), base.idleTimeout(), 8, 2, base.limits()),
+                new DemoHandler());
+        port = server.address().getPort();
+        try (Socket s = socket()) {
+            s.getOutputStream().write(("GET / HTTP/1.1\r\nHost: x\r\n\r\n".repeat(2))
+                    .getBytes(StandardCharsets.US_ASCII));
+            String all = readToEof(s.getInputStream());
+            assertEquals(2, count(all, "HTTP/1.1 200 "));
+            assertEquals(1, count(all, "Connection: close"));
+        }
+    }
 }

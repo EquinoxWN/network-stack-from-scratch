@@ -177,4 +177,36 @@ class RecursiveResolverTest {
         assertEquals(Header.SERVFAIL, r.rcode());
         assertTrue(r.trace().get(r.trace().size() - 1).contains("more than 2 queries"));
     }
+
+    @Test
+    void glueOutsideTheReferringZoneIsNotBelieved() {
+        // The .com server refers example.com to ns.attacker.net and attaches an address for it: .com
+        // may not vouch for a .net name, so that glue must be ignored and the name resolved itself.
+        Zone com = Zone.parse("com", SimNet.COM);
+        Zone netZone = Zone.parse("net", SimNet.NET);
+        net.override("192.5.6.30", q -> {
+            if (!DnsName.isWithin(q.question().name(), "com")) {
+                return netZone.answer(q);
+            }
+            if (!DnsName.isWithin(q.question().name(), "example.com")) {
+                return com.answer(q);
+            }
+            Header h = new Header(q.header().id(), true, 0, false, false, false, false, Header.NOERROR);
+            return new Message(h, q.questions(), List.of(),
+                    List.of(new ResourceRecord("example.com", RecordType.NS, 1, 3600, new RData.Name("ns.attacker.net"))),
+                    List.of(SimNet.rr("ns.attacker.net", RecordType.A, "192.0.2.53")));
+        });
+        RecursiveResolver.Result r = resolver.resolve("www.example.com", RecordType.A);
+        assertEquals(0, net.queriesTo("192.0.2.53"), r.trace().toString());
+        assertTrue(r.addresses().isEmpty());
+    }
+
+    @Test
+    void depthLimitStopsGluelessChains() {
+        RecursiveResolver shallow = new RecursiveResolver(net, new DnsCache(100, clock::get), SimNet.roots(),
+                new RecursiveResolver.Options(53, Duration.ofMillis(10), 64, 0, 8, true), new Random(1));
+        RecursiveResolver.Result r = shallow.resolve("out.example.com", RecordType.A);
+        assertEquals(0, net.queriesTo("192.0.2.91"), r.trace().toString());
+        assertTrue(r.addresses().isEmpty());
+    }
 }

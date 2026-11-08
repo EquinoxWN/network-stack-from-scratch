@@ -176,4 +176,22 @@ class DnsCodecTest {
         assertTrue(DnsName.isWithin("www.example.com", "example.com"));
         assertTrue(!DnsName.isWithin("badexample.com", "example.com"));
     }
+
+    @Test
+    void longChainOfBackwardPointersIsRejected() {
+        // 80 questions; question k's name is a pointer to question k-1's name, so the last ones need
+        // more than 64 jumps even though every pointer points backwards.
+        int n = 80;
+        java.io.ByteArrayOutputStream b = new java.io.ByteArrayOutputStream();
+        b.writeBytes(new byte[] {0, 1, 0, 0, 0, (byte) n, 0, 0, 0, 0, 0, 0});
+        b.writeBytes(new byte[] {0, 0, 1, 0, 1});
+        int prev = 12;
+        for (int k = 1; k < n; k++) {
+            int here = b.size();
+            b.writeBytes(new byte[] {(byte) (0xC0 | (prev >> 8)), (byte) prev, 0, 1, 0, 1});
+            prev = here;
+        }
+        byte[] wire = b.toByteArray();
+        assertThrows(DnsFormatException.class, () -> DnsCodec.decode(wire));
+    }
 }

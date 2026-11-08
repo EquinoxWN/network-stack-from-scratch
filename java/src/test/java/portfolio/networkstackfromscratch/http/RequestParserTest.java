@@ -180,4 +180,16 @@ class RequestParserTest {
         bad.headers().set("X-Evil", "a\r\nSet-Cookie: y");
         assertThrows(IllegalArgumentException.class, () -> bad.serialize("HTTP/1.1", true, false));
     }
+
+    @Test
+    void headerSectionOneByteOverTheLimitIs431() throws HttpParseException {
+        RequestParser.Limits lim = new RequestParser.Limits(64, 40, 10, 10);
+        // Header bytes exclude CRLF: "Host: x" (7) + "A: " and 30 bytes (33) = 40, exactly the limit.
+        String ok = "GET / HTTP/1.1\r\nHost: x\r\nA: " + "a".repeat(30) + "\r\n\r\n";
+        assertEquals(1, new RequestParser(lim).feed(java.nio.ByteBuffer.wrap(
+                ok.getBytes(java.nio.charset.StandardCharsets.US_ASCII))).size());
+        String over = "GET / HTTP/1.1\r\nHost: x\r\nA: " + "a".repeat(30) + "\r\nB: b\r\n\r\n"; // 44 header bytes, every line short
+        assertEquals(431, assertThrows(HttpParseException.class, () -> new RequestParser(lim).feed(
+                java.nio.ByteBuffer.wrap(over.getBytes(java.nio.charset.StandardCharsets.US_ASCII)))).status());
+    }
 }
